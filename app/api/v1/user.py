@@ -5,8 +5,8 @@ from datetime import datetime, timedelta
 
 from app.core.config import settings
 from app.db.get_db import get_db
-from app.models.models import Users, Employees
-from app.schemas.schemas import UserCreate, UserResponse, Token
+from app.models.models import Users, Employers
+from app.schemas.schemas import UserCreate, UserResponse, Token, LoginDTO
 from app.services.user_service import (
     token_blacklist,
     failed_attempts_cache,
@@ -25,7 +25,7 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
     if user:
         raise HTTPException(status_code=400, detail="Username already registered")
 
-    new_employee = Employees(
+    new_employee = Employers(
         telegram_name=user_in.employee.telegram_name,
         full_name=user_in.employee.full_name,
         join_date=user_in.employee.join_date
@@ -51,27 +51,27 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-def login(username: str, password: str, db: Session = Depends(get_db)):
-    user = db.query(Users).filter(Users.username == username).first()
+def login(data: LoginDTO, db: Session = Depends(get_db)):
+    user = db.query(Users).filter(Users.username == data.username).first()
     if not user:
         raise HTTPException(status_code=400, detail="Incorrect username or password")
 
-    cache = failed_attempts_cache.get(username, {"attempts": 0, "banned_until": None})
+    cache = failed_attempts_cache.get(data.username, {"attempts": 0, "banned_until": None})
     banned_until = cache.get("banned_until")
     if banned_until and datetime.utcnow() < banned_until:
         raise HTTPException(status_code=403, detail="User is banned. Try again later.")
 
-    if not verify_password(password, user.hashed_password):
+    if not verify_password(data.password, user.hashed_password):
         attempts = cache.get("attempts", 0) + 1
         banned_until = None
         if attempts >= settings.MAX_FAILED_ATTEMPTS:
             banned_until = datetime.utcnow() + timedelta(minutes=settings.BAN_DURATION_MINUTES)
             attempts = 0
-        failed_attempts_cache[username] = {"attempts": attempts, "banned_until": banned_until}
+        failed_attempts_cache[data.username] = {"attempts": attempts, "banned_until": banned_until}
         raise HTTPException(status_code=400, detail="Incorrect username or password")
 
-    if username in failed_attempts_cache:
-        del failed_attempts_cache[username]
+    if data.username in failed_attempts_cache:
+        del failed_attempts_cache[data.username]
 
     token_data = {"sub": user.username}
     access_token = create_access_token(data=token_data)

@@ -37,3 +37,7 @@ class UserResponse(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+class LoginDTO(BaseModel):
+    username: str
+    password: str

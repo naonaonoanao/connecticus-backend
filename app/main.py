@@ -1,4 +1,5 @@
 from dotenv import load_dotenv
+from starlette.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
@@ -22,6 +23,16 @@ def get_application() -> FastAPI:
     v1_router.include_router(user.router)
 
     app.include_router(v1_router)
+
+    origins = ["*"]
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     return app
 
