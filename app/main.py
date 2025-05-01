@@ -10,10 +10,12 @@ from app.api.v1 import employee, user
 from fastapi import APIRouter
 
 from app.db.create_tables import create_tables
+from app.db.seed_data import seed_data
 
 
 def get_application() -> FastAPI:
     create_tables(engine)
+    seed_data(engine)
     app = FastAPI(
         title="My Basic FastAPI App",
         version="1.0.0",

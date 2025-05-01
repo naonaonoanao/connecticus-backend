@@ -29,8 +29,8 @@ class Employers(Base):
     last_name = Column(String(52), nullable=False)
     middle_name = Column(String(52), nullable=True)
     date_of_birth = Column(Date, nullable=False)
-    email = Column(String(10), nullable=False)
-    phone_number = Column(String(10), nullable=False)
+    email = Column(String(150), nullable=False)
+    phone_number = Column(String(18), nullable=False)
     telegram_name = Column(String(25), nullable=False)
     city = Column(String(52), nullable=False)
     id_position = Column(UUID(as_uuid=True), ForeignKey("positions.id_position"))
@@ -86,7 +86,7 @@ class Projects(Base):
 
 class ProjectsEmployers(Base):
     __tablename__ = "projects_employers"
-    id_department = Column(UUID(as_uuid=True), ForeignKey("departments.id_department"), primary_key=True)
+    id_role = Column(UUID(as_uuid=True), ForeignKey("roles.id_role"), primary_key=True)
     id_employee = Column(UUID(as_uuid=True), ForeignKey("employers.id_employee"), primary_key=True)
     id_project = Column(UUID(as_uuid=True), ForeignKey("projects.id_project"), primary_key=True)
 
@@ -141,5 +141,13 @@ class Users(Base):
     username = Column(String(50), primary_key=True, index=True)
     hashed_password = Column(String(128), nullable=False)
     employee_id = Column(UUID(as_uuid=True), ForeignKey("employers.id_employee"), nullable=False)
+    role_id = Column(UUID(as_uuid=True), ForeignKey("system_roles.id_role"), nullable=False)
 
     employee = relationship("Employers", back_populates="user")
+
+
+class SystemRoles(Base):
+    __tablename__ = "system_roles"
+    id_role = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    role_name = Column(String(20), nullable=False)
+
