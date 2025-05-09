@@ -1,5 +1,6 @@
+import traceback
 from typing import Dict
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 
@@ -13,41 +14,10 @@ from app.services.user_service import (
     verify_password,
     get_password_hash,
     create_access_token,
-    get_current_user
+    get_current_user, get_user_with_related
 )
 
 router = APIRouter(prefix='/user', tags=['User'])
-
-
-@router.post("/register", response_model=UserResponse)
-def register(user_in: UserCreate, db: Session = Depends(get_db)):
-    user = db.query(Users).filter(Users.username == user_in.username).first()
-    if user:
-        raise HTTPException(status_code=400, detail="Username already registered")
-
-    new_employee = Employers(
-        telegram_name=user_in.employee.telegram_name,
-        full_name=user_in.employee.full_name,
-        join_date=user_in.employee.join_date
-    )
-    db.add(new_employee)
-    db.commit()
-    db.refresh(new_employee)
-
-    hashed_password = get_password_hash(user_in.password)
-    new_user = Users(
-        username=user_in.username,
-        hashed_password=hashed_password,
-        employee_id=new_employee.pk_employee
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-
-    return {
-        "username": new_user.username,
-        "employee": new_employee
-    }
 
 
 @router.post("/login", response_model=Token)
@@ -73,7 +43,7 @@ def login(data: LoginDTO, db: Session = Depends(get_db)):
     if data.username in failed_attempts_cache:
         del failed_attempts_cache[data.username]
 
-    token_data = {"sub": user.username}
+    token_data = {"sub": user.username}  # TODO: сюда можем дальше подкладывать роль
     access_token = create_access_token(data=token_data)
     return Token(access_token=access_token)
 
@@ -85,8 +55,20 @@ def logout(user_data: Dict = Depends(get_current_user)):
 
 
 @router.get("/me", response_model=UserResponse)
-def get_me(user_data: Dict = Depends(get_current_user)):
-    return {
-        "username": user_data["user"].username,
-        "employee": user_data["employee"]
-    }
+def get_me(
+    user_data: Dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        username = user_data["user"].username
+        user = get_user_with_related(db, username)
+
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        return user
+    except HTTPException:
+        raise
+    except Exception:
+        traceback.print_exc()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal error")
