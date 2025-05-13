@@ -164,11 +164,11 @@ async def check_unique_fields(db: Session, employee_id: UUID, email: str = None,
     return duplicated_fields
 
 
-async def update_employee(db: Session, employee, employee_updated_data: Dict):
-    for field, value in employee_updated_data.items():
-        setattr(employee, field, value)
+async def update_entity(db: Session, entity, entity_updated_data: Dict):
+    for field, value in entity_updated_data.items():
+        setattr(entity, field, value)
 
     db.commit()
-    db.refresh(employee)
+    db.refresh(entity)
 
-    return employee
+    return entity

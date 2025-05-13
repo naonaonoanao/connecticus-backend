@@ -8,7 +8,7 @@ from uuid import UUID
 from app.models.models import Employers
 from app.schemas.schemas import EmployeeCreate, EmployeeRead, EmployeeUpdate, MessageDTO
 from app.db.get_db import get_db
-from app.services.user_service import check_unique_fields, get_current_user, update_employee
+from app.services.user_service import check_unique_fields, get_current_user, update_entity
 
 router = APIRouter(prefix='/employee', tags=['Employee'])
 
@@ -58,10 +58,10 @@ async def edit_employee(
         if duplicated_fields:
             raise HTTPException(status_code=400, detail=f"{str(duplicated_fields)} already in use")
 
-        updated_employee = await update_employee(
+        updated_employee = await update_entity(
             db=db,
-            employee=user_data['employee'],
-            employee_updated_data=employee_update.dict()
+            entity=user_data['employee'],
+            entity_updated_data=employee_update.dict()
         )
 
         return MessageDTO(message=f"Employee {updated_employee.id_employee} successfully")
