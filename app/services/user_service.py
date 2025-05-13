@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Dict, Any
+from uuid import UUID
+
 import jwt
 from fastapi import Depends, HTTPException, status, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -12,7 +14,7 @@ from app.models.models import (
     Interests,
     Technologies, Ranks,
     Projects, Roles,
-    Positions, Departments
+    Positions, Departments, Employers
 )
 from app.core.config import settings
 from app.db.get_db import get_db
@@ -133,3 +135,40 @@ def get_user_with_related(db: Session, username: str) -> Optional[Dict[str, Any]
     ]
 
     return {"username": user.username, "employee": emp_data}
+
+
+async def check_unique_fields(db: Session, employee_id: UUID, email: str = None, phone: str = None, telegram: str = None):
+    duplicated_fields = []
+
+    if email:
+        existing = db.query(Employers).filter(
+            Employers.email == email, Employers.id_employee != employee_id
+        ).first()
+        if existing:
+            duplicated_fields.append("email")
+
+    if phone:
+        existing = db.query(Employers).filter(
+            Employers.phone_number == phone, Employers.id_employee != employee_id
+        ).first()
+        if existing:
+            duplicated_fields.append("phone_number")
+
+    if telegram:
+        existing = db.query(Employers).filter(
+            Employers.telegram_name == telegram, Employers.id_employee != employee_id
+        ).first()
+        if existing:
+            duplicated_fields.append("telegram_name")
+
+    return duplicated_fields
+
+
+async def update_employee(db: Session, employee, employee_updated_data: Dict):
+    for field, value in employee_updated_data.items():
+        setattr(employee, field, value)
+
+    db.commit()
+    db.refresh(employee)
+
+    return employee

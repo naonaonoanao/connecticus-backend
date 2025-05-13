@@ -1,7 +1,13 @@
-from pydantic import BaseModel
+import re
+
+from pydantic import BaseModel, constr, EmailStr, field_validator
 from typing import Optional, List
 from uuid import UUID
 from datetime import date
+
+
+class MessageDTO(BaseModel):
+    message: str
 
 
 class InterestsRead(BaseModel):
@@ -105,3 +111,32 @@ class GraphLink(BaseModel):
 class GraphViewDTO(BaseModel):
     nodes: List[GraphNode]
     links: List[GraphLink]
+
+
+class EmployeeUpdate(BaseModel):
+    first_name: constr(strip_whitespace=True, min_length=1, max_length=50)
+    last_name: Optional[constr(strip_whitespace=True, min_length=1, max_length=50)]
+    middle_name: constr(strip_whitespace=True, min_length=1, max_length=50)
+    date_of_birth: date
+    email: EmailStr
+    phone_number: constr(strip_whitespace=True, min_length=10, max_length=20)
+    telegram_name: constr(strip_whitespace=True, min_length=3, max_length=32)
+    city: constr(strip_whitespace=True, min_length=1, max_length=100)
+
+    @field_validator('phone_number')
+    def validate_phone(cls, v):
+        if v and not re.match(r'^[\d\s\-\+\(\)]+$', v):
+            raise ValueError('Недопустимый формат номера телефона')
+        return v
+
+    @field_validator('telegram_name')
+    def validate_telegram_name(cls, v):
+        if v and not re.match(r'^[a-zA-Z0-9_]{3,32}$', v):
+            raise ValueError('Недопустимый Telegram username: допустимы только буквы, цифры и _')
+        return v
+
+    @field_validator('date_of_birth')
+    def validate_dob(cls, v):
+        if v and v > date.today():
+            raise ValueError('Дата рождения не может быть в будущем')
+        return v
