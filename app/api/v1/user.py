@@ -6,13 +6,12 @@ from datetime import datetime, timedelta
 
 from app.core.config import settings
 from app.db.get_db import get_db
-from app.models.models import Users, Employers
-from app.schemas.schemas import UserCreate, UserResponse, Token, LoginDTO
+from app.models.models import Users
+from app.schemas.schemas import UserResponse, Token, LoginDTO
 from app.services.user_service import (
     token_blacklist,
     failed_attempts_cache,
     verify_password,
-    get_password_hash,
     create_access_token,
     get_current_user, get_user_with_related
 )
