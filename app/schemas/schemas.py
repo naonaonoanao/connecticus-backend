@@ -73,6 +73,18 @@ class EmployeeRead(BaseModel):
         orm_mode = True
 
 
+class PaginationMeta(BaseModel):
+    total_count: int
+    total_pages: int
+    skip: int
+    limit: int
+
+
+class EmployeeListWithMeta(BaseModel):
+    data: List[EmployeeRead]
+    meta: PaginationMeta
+
+
 class UserCreate(BaseModel):
     username: str
     password: str
