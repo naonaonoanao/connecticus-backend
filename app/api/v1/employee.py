@@ -9,7 +9,7 @@ from app.models.models import Employers
 from app.schemas.schemas import EmployeeCreate, EmployeeRead, EmployeeUpdate, MessageDTO, EmployeeListWithMeta
 from app.db.get_db import get_db
 from app.services.user_service import check_unique_fields, get_current_user, update_entity, get_employee_with_id, \
-    get_employees_lst, get_employees_lst_common
+    get_employees_list
 
 router = APIRouter(prefix='/employee', tags=['Employee'])
 
@@ -30,8 +30,12 @@ async def create_employee(
     return db_employee
 
 
-@router.get("/employees/filters", response_model=EmployeeListWithMeta)
-async def get_employees_list_filters(
+@router.get(
+    "/employees",
+    response_model=EmployeeListWithMeta
+)
+async def list_employees(
+        str_to_find: Optional[str] = Query(None, description="Общий поиск по всем полям"),
         first_name: Optional[List[str]] = Query(None),
         last_name: Optional[List[str]] = Query(None),
         middle_name: Optional[List[str]] = Query(None),
@@ -41,9 +45,9 @@ async def get_employees_list_filters(
         city: Optional[List[str]] = Query(None),
         id_position: Optional[List[str]] = Query(None),
         id_department: Optional[List[str]] = Query(None),
-        id_interest: Optional[List[str]] = Query(None, description="Filter by interest IDs"),
-        id_technology: Optional[List[str]] = Query(None, description="Filter by technology IDs"),
-        id_project: Optional[List[str]] = Query(None, description="Filter by project IDs"),
+        id_interest: Optional[List[str]] = Query(None),
+        id_technology: Optional[List[str]] = Query(None),
+        id_project: Optional[List[str]] = Query(None),
         skip: int = Query(0, ge=0),
         limit: int = Query(10, ge=1),
         db: Session = Depends(get_db)
@@ -62,40 +66,22 @@ async def get_employees_list_filters(
         "id_technology": id_technology,
         "id_project": id_project,
     }
-
-    result = get_employees_lst(db, filters=filters, skip=skip, limit=limit)
-    ans = {
+    res = get_employees_list(
+        db,
+        str_to_find=str_to_find,
+        filters=filters,
+        skip=skip,
+        limit=limit
+    )
+    return {
+        "data": res["employees"],
         "meta": {
-            "total_count": result['total_count'],
-            "total_pages": result['total_pages'],
+            "total_count": res["total_count"],
+            "total_pages": res["total_pages"],
             "skip": skip,
             "limit": limit
-        },
-        "data": result['employees']
+        }
     }
-
-    return ans
-
-
-@router.get("/employees/search", response_model=EmployeeListWithMeta)
-async def get_employees_list_search(
-        str_to_find: str = "",
-        skip: int = Query(0, ge=0),
-        limit: int = Query(10, ge=1),
-        db: Session = Depends(get_db)
-):
-    result = get_employees_lst_common(db, str_to_find=str_to_find, skip=skip, limit=limit)
-    ans = {
-        "meta": {
-            "total_count": result['total_count'],
-            "total_pages": result['total_pages'],
-            "skip": skip,
-            "limit": limit
-        },
-        "data": result['employees']
-    }
-
-    return ans
 
 
 @router.get("/{employee_id}", response_model=EmployeeRead)

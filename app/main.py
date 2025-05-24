@@ -6,7 +6,7 @@ load_dotenv()
 from app.core.config import settings
 from fastapi import FastAPI
 from app.core.database import engine
-from app.api.v1 import employee, user, graph
+from app.api.v1 import employee, user, graph, common
 from fastapi import APIRouter
 
 from app.db.create_tables import create_tables
@@ -24,6 +24,7 @@ def get_application() -> FastAPI:
     v1_router.include_router(employee.router)
     v1_router.include_router(user.router)
     v1_router.include_router(graph.router)
+    v1_router.include_router(common.router)
 
     app.include_router(v1_router)
 

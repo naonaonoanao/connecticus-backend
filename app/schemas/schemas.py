@@ -10,6 +10,12 @@ class MessageDTO(BaseModel):
     message: str
 
 
+class ProjectRead(BaseModel):
+    id_project: UUID
+    name_project: str
+    description: str
+
+
 class InterestsRead(BaseModel):
     id_interest: UUID
     name_interest: str
@@ -24,6 +30,11 @@ class TechnologyRead(BaseModel):
     id_technology: UUID
     name_technology: str
     rank: RankRead
+
+
+class TechnologySoloRead(BaseModel):
+    id_technology: UUID
+    name_technology: str
 
 
 class DepartmentRead(BaseModel):

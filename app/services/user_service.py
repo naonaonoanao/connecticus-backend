@@ -1,5 +1,5 @@
+import math
 from datetime import datetime, timedelta
-from math import ceil
 from typing import Dict, Any, List
 from uuid import UUID
 
@@ -233,13 +233,45 @@ def get_employee_with_id(db: Session, id_employee: str) -> Optional[Dict[str, An
     return emp_data
 
 
-def get_employees_lst(
+def get_employees_list(
         db: Session,
+        *,
+        str_to_find: Optional[str] = None,
         filters: Dict[str, Optional[List[str]]],
         skip: int = 0,
         limit: int = 10
 ) -> Dict[str, Any]:
     query = db.query(Employers)
+
+    if str_to_find:
+        pattern = f"%{str_to_find}%"
+        query = (
+            query
+                .outerjoin(InterestsEmployers, InterestsEmployers.id_employee == Employers.id_employee)
+                .outerjoin(Interests, Interests.id_interest == InterestsEmployers.id_interest)
+                .outerjoin(TechnologyEmployee, TechnologyEmployee.id_employee == Employers.id_employee)
+                .outerjoin(Technologies, Technologies.id_technology == TechnologyEmployee.id_technology)
+                .outerjoin(Ranks, Ranks.id_rank == TechnologyEmployee.id_rank)
+                .outerjoin(ProjectsEmployers, ProjectsEmployers.id_employee == Employers.id_employee)
+                .outerjoin(Projects, Projects.id_project == ProjectsEmployers.id_project)
+                .outerjoin(Roles, Roles.id_role == ProjectsEmployers.id_role)
+        )
+
+        or_clauses = [
+            Employers.first_name.ilike(pattern),
+            Employers.last_name.ilike(pattern),
+            Employers.middle_name.ilike(pattern),
+            Employers.email.ilike(pattern),
+            Employers.phone_number.ilike(pattern),
+            Employers.telegram_name.ilike(pattern),
+            Employers.city.ilike(pattern),
+            Interests.name_interest.ilike(pattern),
+            Technologies.name_technology.ilike(pattern),
+            Ranks.name_rank.ilike(pattern),
+            Projects.name_project.ilike(pattern),
+            Roles.name_role.ilike(pattern),
+        ]
+        query = query.filter(or_(*or_clauses))
 
     text_fields = [
         ("first_name", Employers.first_name),
@@ -266,14 +298,12 @@ def get_employees_lst(
                 .join(InterestsEmployers, InterestsEmployers.id_employee == Employers.id_employee)
                 .filter(InterestsEmployers.id_interest.in_(filters["id_interest"]))
         )
-
     if filters.get("id_technology"):
         query = (
             query
                 .join(TechnologyEmployee, TechnologyEmployee.id_employee == Employers.id_employee)
                 .filter(TechnologyEmployee.id_technology.in_(filters["id_technology"]))
         )
-
     if filters.get("id_project"):
         query = (
             query
@@ -282,16 +312,14 @@ def get_employees_lst(
         )
 
     base_q = query.distinct(Employers.id_employee)
-
-    total_count = db.query(func.count(distinct(Employers.id_employee))).select_from(base_q.subquery()).scalar()
-    total_pages = ceil(total_count / limit) if limit > 0 else 1
-
-    employees = (
-        base_q
-            .offset(skip)
-            .limit(limit)
-            .all()
+    total_count = (
+        db.query(func.count(distinct(Employers.id_employee)))
+            .select_from(base_q.subquery())
+            .scalar()
     )
+    total_pages = math.ceil(total_count / limit) if limit > 0 else 1
+
+    employees = base_q.offset(skip).limit(limit).all()
 
     result: List[Dict[str, Any]] = []
     for emp in employees:
@@ -336,8 +364,7 @@ def get_employees_lst(
                     "id_rank": r.id_rank,
                     "name_rank": r.name_rank
                 }
-            }
-            for t, r in techs
+            } for t, r in techs
         ]
 
         projs = (
@@ -355,139 +382,15 @@ def get_employees_lst(
                     "id_role": rl.id_role,
                     "name_role": rl.name_role
                 }
-            }
-            for p, rl in projs
+            } for p, rl in projs
         ]
 
         result.append(emp_data)
 
     return {
         "employees": result,
+        "total_count": total_count,
         "total_pages": total_pages,
-        "total_count": total_count
-    }
-
-
-def get_employees_lst_common(
-        db: Session,
-        str_to_find: str,
-        skip: int = 0,
-        limit: int = 10
-) -> Dict[str, Any]:
-    pattern = f"%{str_to_find}%"
-    or_clauses = [
-        Employers.first_name.ilike(pattern),
-        Employers.last_name.ilike(pattern),
-        Employers.middle_name.ilike(pattern),
-        Employers.email.ilike(pattern),
-        Employers.phone_number.ilike(pattern),
-        Employers.telegram_name.ilike(pattern),
-        Employers.city.ilike(pattern),
-        Interests.name_interest.ilike(pattern),
-        Technologies.name_technology.ilike(pattern),
-        Ranks.name_rank.ilike(pattern),
-        Projects.name_project.ilike(pattern),
-        Roles.name_role.ilike(pattern),
-    ]
-
-    base_query = (
-        db.query(Employers)
-            .outerjoin(InterestsEmployers, InterestsEmployers.id_employee == Employers.id_employee)
-            .outerjoin(Interests, Interests.id_interest == InterestsEmployers.id_interest)
-            .outerjoin(TechnologyEmployee, TechnologyEmployee.id_employee == Employers.id_employee)
-            .outerjoin(Technologies, Technologies.id_technology == TechnologyEmployee.id_technology)
-            .outerjoin(Ranks, Ranks.id_rank == TechnologyEmployee.id_rank)
-            .outerjoin(ProjectsEmployers, ProjectsEmployers.id_employee == Employers.id_employee)
-            .outerjoin(Projects, Projects.id_project == ProjectsEmployers.id_project)
-            .outerjoin(Roles, Roles.id_role == ProjectsEmployers.id_role)
-            .filter(or_(*or_clauses))
-            .distinct(Employers.id_employee)
-    )
-
-    total_count = db.query(func.count(distinct(Employers.id_employee))) \
-        .select_from(base_query.subquery()) \
-        .scalar()
-    total_pages = ceil(total_count / limit) if limit > 0 else 1
-
-    employees = (
-        base_query
-            .offset(skip)
-            .limit(limit)
-            .all()
-    )
-
-    result: List[Dict[str, Any]] = []
-    for emp in employees:
-        emp_data: Dict[str, Any] = {
-            "id_employee": emp.id_employee,
-            "first_name": emp.first_name,
-            "last_name": emp.last_name,
-            "middle_name": emp.middle_name,
-            "date_of_birth": emp.date_of_birth,
-            "email": emp.email,
-            "phone_number": emp.phone_number,
-            "telegram_name": emp.telegram_name,
-            "city": emp.city,
-        }
-
-        pos = db.query(Positions).get(emp.id_position)
-        dept = db.query(Departments).get(emp.id_department)
-        emp_data["position"] = {"id_position": pos.id_position, "position_name": pos.position_name} if pos else None
-        emp_data["department"] = {"id_department": dept.id_department,
-                                  "name_department": dept.name_department} if dept else None
-
-        ints = (
-            db.query(Interests)
-                .join(InterestsEmployers, Interests.id_interest == InterestsEmployers.id_interest)
-                .filter(InterestsEmployers.id_employee == emp.id_employee)
-                .all()
-        )
-        emp_data["interests"] = [{"id_interest": i.id_interest, "name_interest": i.name_interest} for i in ints]
-
-        techs = (
-            db.query(Technologies, Ranks)
-                .join(TechnologyEmployee, Technologies.id_technology == TechnologyEmployee.id_technology)
-                .join(Ranks, TechnologyEmployee.id_rank == Ranks.id_rank)
-                .filter(TechnologyEmployee.id_employee == emp.id_employee)
-                .all()
-        )
-        emp_data["technologies"] = [
-            {
-                "id_technology": t.id_technology,
-                "name_technology": t.name_technology,
-                "rank": {
-                    "id_rank": r.id_rank,
-                    "name_rank": r.name_rank
-                }
-            }
-            for t, r in techs
-        ]
-
-        projs = (
-            db.query(Projects, Roles)
-                .join(ProjectsEmployers, Projects.id_project == ProjectsEmployers.id_project)
-                .join(Roles, ProjectsEmployers.id_role == Roles.id_role)
-                .filter(ProjectsEmployers.id_employee == emp.id_employee)
-                .all()
-        )
-        emp_data["projects"] = [
-            {
-                "id_project": p.id_project,
-                "name_project": p.name_project,
-                "role": {
-                    "id_role": rl.id_role,
-                    "name_role": rl.name_role
-                }
-            }
-            for p, rl in projs
-        ]
-
-        result.append(emp_data)
-
-    return {
-        "employees": result,
-        "total_pages": total_pages,
-        "total_count": total_count
     }
 
 
