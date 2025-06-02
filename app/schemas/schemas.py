@@ -1,7 +1,7 @@
 import re
 
-from pydantic import BaseModel, constr, EmailStr, field_validator
-from typing import Optional, List
+from pydantic import BaseModel, constr, EmailStr, field_validator, model_validator, ConfigDict
+from typing import Optional, List, Union
 from uuid import UUID
 from datetime import date
 
@@ -137,9 +137,6 @@ class GraphViewDTO(BaseModel):
 
 
 class EmployeeUpdate(BaseModel):
-    first_name: constr(strip_whitespace=True, min_length=1, max_length=50)
-    last_name: Optional[constr(strip_whitespace=True, min_length=1, max_length=50)]
-    middle_name: constr(strip_whitespace=True, min_length=1, max_length=50)
     date_of_birth: date
     email: EmailStr
     phone_number: constr(strip_whitespace=True, min_length=10, max_length=20)
@@ -163,3 +160,122 @@ class EmployeeUpdate(BaseModel):
         if v and v > date.today():
             raise ValueError('Дата рождения не может быть в будущем')
         return v
+
+
+class InterestInput(BaseModel):
+    id: Optional[UUID] = None
+    name: Optional[str] = None
+
+    @model_validator(mode="before")
+    def check_either_id_or_name(cls, values):
+        if not values.get("id") and not values.get("name"):
+            raise ValueError("Нужно указать либо id, либо name интереса")
+        return values
+
+
+class ExistingInterestInput(BaseModel):
+    id: UUID
+
+
+class NewInterestInput(BaseModel):
+    name_interest: constr(strip_whitespace=True, min_length=1, max_length=52)
+
+
+class EmployeeInterestsUpdate(BaseModel):
+    interests: list[Union[ExistingInterestInput, NewInterestInput]]
+
+
+class TechnologyRankInput(BaseModel):
+    id_technology: UUID
+    id_rank: UUID
+
+
+class ExistingTechnologyInput(BaseModel):
+    id_technology: UUID
+    id_rank: UUID
+
+
+class NewTechnologyInput(BaseModel):
+    name_technology: constr(strip_whitespace=True, min_length=1, max_length=52)
+    description: constr(strip_whitespace=True, min_length=1, max_length=52)
+    id_rank: UUID
+
+
+class EmployeeTechnologiesUpdate(BaseModel):
+    technologies: List[Union[ExistingTechnologyInput, NewTechnologyInput]]
+
+
+class ProjectRoleInput(BaseModel):
+    id_project: UUID
+    id_role: UUID
+
+
+class EmployeeProjectsUpdate(BaseModel):
+    projects: List[ProjectRoleInput]
+
+
+class EventCreate(BaseModel):
+    name_event: constr(strip_whitespace=True, min_length=1, max_length=52)
+    date: date
+    place: constr(strip_whitespace=True, min_length=1, max_length=52)
+    id_event_type: UUID
+    attendee_ids: Optional[List[UUID]] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EventUpdate(BaseModel):
+    name_event: constr(strip_whitespace=True, min_length=1, max_length=52)
+    date: date
+    place: constr(strip_whitespace=True, min_length=1, max_length=52)
+    id_event_type: UUID
+
+
+class EmployeeSummary(BaseModel):
+    id_employee: UUID
+    first_name: str
+    last_name: str
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+
+class EventTypeRead(BaseModel):
+    id_event_type: UUID
+    name_type: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EventRead(BaseModel):
+    id_event: UUID
+    name_event: str
+    date: date
+    place: str
+    owner: EmployeeSummary
+    event_type: EventTypeRead
+    attendees: List[EmployeeSummary] = []
+
+    class Config:
+        orm_mode = True
+
+    @classmethod
+    def from_orm(cls, event, event_type_summary, owner_summary, attendees: List[EmployeeSummary]):
+        return cls(
+            id_event=event.id_event,
+            name_event=event.name_event,
+            date=event.date,
+            place=event.place,
+            owner=owner_summary,
+            event_type=event_type_summary,
+            attendees=attendees,
+        )
+
+
+class PaginatedEvents(BaseModel):
+    total_count: int
+    total_pages: int
+    skip: int
+    limit: int
+    events: List[EventRead]
