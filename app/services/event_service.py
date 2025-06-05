@@ -18,6 +18,7 @@ from app.schemas.schemas import (
     PaginatedEvents,
     EmployeeSummary, EventTypeRead,
 )
+from app.services.user_service import create_notification
 
 
 def create_event(db: Session, owner_id: UUID, event_in: EventCreate) -> Events:
@@ -254,6 +255,8 @@ def join_event(db: Session, event_id: UUID, employee_id: UUID):
 
     link = EventEmployers(id_event=event_id, id_employee=employee_id)
     db.add(link)
+
+    create_notification(db, f"Вы добавлены на мероприятие: {event.name_event}", [employee_id])
 
 
 def leave_event(db: Session, event_id: UUID, employee_id: UUID):

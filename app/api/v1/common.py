@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import distinct
 
@@ -10,10 +10,11 @@ from app.models.models import (
     Departments,
     Projects,
     Technologies,
-    Interests,
+    Interests, NotificationsEmployees, Notifications,
 )
 from app.schemas.schemas import PositionRead, DepartmentRead, TechnologyRead, InterestsRead, ProjectRead, \
-    TechnologySoloRead
+    TechnologySoloRead, NotificationReadRequest, NotificationOut
+from app.services.user_service import get_current_user
 
 router = APIRouter(prefix='/common', tags=['Common'])
 
@@ -52,3 +53,86 @@ async def list_technologies(db: Session = Depends(get_db)):
 async def list_interests(db: Session = Depends(get_db)):
     ints = db.query(Interests).order_by(Interests.name_interest).all()
     return ints
+
+
+@router.get(
+    "/notifications",
+    response_model=List[NotificationOut],
+    summary="Получить все уведомления для сотрудника (с флагом прочитано/непрочитано)"
+)
+async def get_notifications_for_employee(
+    user_data: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Возвращает список всех уведомлений конкретного сотрудника.
+    Для каждого уведомления возвращаются:
+      - id (UUID)
+      - content (строка)
+      - is_shown (булево — прочитано/нет)
+    """
+    exists_emp = db.query(Employers).filter(Employers.id_employee == user_data["employee"].id_employee).first()
+    if not exists_emp:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    rows = (
+        db.query(Notifications, NotificationsEmployees.is_shown)
+          .join(
+              NotificationsEmployees,
+              Notifications.id == NotificationsEmployees.id_notification
+          )
+          .filter(NotificationsEmployees.id_employee == user_data["employee"].id_employee)
+          .order_by(Notifications.id)
+          .all()
+    )
+
+    result: List[NotificationOut] = []
+    for notif, is_shown in rows:
+        result.append(
+            NotificationOut(
+                id=notif.id,
+                content=notif.content,
+                is_shown=is_shown
+            )
+        )
+    return result
+
+
+@router.post(
+    "/notifications/read",
+    summary="Отметить список уведомлений как прочитанных для конкретного сотрудника"
+)
+async def mark_notifications_as_read(
+    payload: NotificationReadRequest,
+    user_data: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    payload: {
+      "employee_id": UUID,
+      "notification_ids": [UUID, UUID, ...]
+    }
+    Отмечаем все записи NotificationsEmployees.is_shown = True
+    для заданного employee_id и списка notification_ids.
+    """
+    exists_emp = db.query(Employers).filter(Employers.id_employee == user_data["employee"].id_employee).first()
+    if not exists_emp:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    assocs = (
+        db.query(NotificationsEmployees)
+          .filter(
+              NotificationsEmployees.id_employee == user_data["employee"].id_employee,
+              NotificationsEmployees.id_notification.in_(payload.notification_ids)
+          )
+          .all()
+    )
+
+    if not assocs:
+        return {"updated": 0}
+
+    for assoc in assocs:
+        assoc.is_shown = True
+
+    db.commit()
+    return {"updated": len(assocs)}

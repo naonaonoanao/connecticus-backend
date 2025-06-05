@@ -197,7 +197,7 @@ class ExistingTechnologyInput(BaseModel):
 
 class NewTechnologyInput(BaseModel):
     name_technology: constr(strip_whitespace=True, min_length=1, max_length=52)
-    description: constr(strip_whitespace=True, min_length=1, max_length=52)
+    description: constr(strip_whitespace=True, min_length=1, max_length=52) = None
     id_rank: UUID
 
 
@@ -279,3 +279,20 @@ class PaginatedEvents(BaseModel):
     skip: int
     limit: int
     events: List[EventRead]
+
+
+class NotificationCreate(BaseModel):
+    content: str
+
+
+class NotificationReadRequest(BaseModel):
+    notification_ids: List[UUID]
+
+
+class NotificationOut(BaseModel):
+    id: UUID
+    content: str
+    is_shown: bool
+
+    class Config:
+        orm_mode = True

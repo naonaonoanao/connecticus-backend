@@ -25,7 +25,7 @@ from app.db.get_db import get_db
 
 from app.models.models import Employers, EventEmployers, Events, EventTypes
 from app.schemas.schemas import MessageDTO
-from app.services.user_service import get_current_user
+from app.services.user_service import get_current_user, create_notification
 
 router = APIRouter(prefix="/events", tags=["Events"])
 
@@ -39,6 +39,7 @@ async def create_new_event(
     owner_id = user_data["employee"].id_employee
     new_event = create_event(db, owner_id, event_in)
     db.commit()
+    db.flush()
 
     unique_attendees = set(event_in.attendee_ids or [])
     for attendee_id in unique_attendees:
@@ -51,6 +52,8 @@ async def create_new_event(
 
         db.add(EventEmployers(id_event=new_event.id_event, id_employee=attendee_id))
         db.commit()
+
+        create_notification(db, f"Вы добавлены на мероприятие: {new_event.name_event}", [attendee_id])
 
     event_type_obj = db.query(EventTypes).filter_by(id_event_type=new_event.id_event_type).first()
     if not event_type_obj:
@@ -77,25 +80,6 @@ async def create_new_event(
     )
 
 
-@router.post("/{event_id}/attendees", response_model=MessageDTO)
-async def add_person_to_event(
-    event_id: UUID,
-    employee_id: UUID = Query(..., description="ID сотрудника, которого добавляем"),
-    db: Session = Depends(get_db),
-    user_data: dict = Depends(get_current_user),
-):
-    event = db.query(Events).filter_by(id_event=event_id).first()
-    if not event:
-        raise HTTPException(status_code=404, detail="Мероприятие не найдено")
-
-    if event.id_owner != user_data["employee"].id_employee:
-        raise HTTPException(status_code=403, detail="Нет прав добавлять сотрудников")
-
-    add_attendee(db, event_id, employee_id)
-    db.commit()
-    return MessageDTO(message="Сотрудник успешно добавлен в мероприятие")
-
-
 @router.get("", response_model=PaginatedEvents)
 async def get_all_events(
     skip: int = Query(0, ge=0),
@@ -118,6 +102,39 @@ async def get_my_events(
     return list_my_events(db, employee_id, search=search, skip=skip, limit=limit)
 
 
+@router.delete("/{event_id}/leave", response_model=MessageDTO)
+async def leave_myself(
+    event_id: UUID,
+    db: Session = Depends(get_db),
+    user_data: dict = Depends(get_current_user),
+):
+    leave_event(db, event_id, user_data["employee"].id_employee)
+    db.commit()
+    return MessageDTO(message="Вы отказались от участия в мероприятии")
+
+
+@router.post("/{event_id}/attendees", response_model=MessageDTO)
+async def add_person_to_event(
+    event_id: UUID,
+    employee_id: UUID = Query(..., description="ID сотрудника, которого добавляем"),
+    db: Session = Depends(get_db),
+    user_data: dict = Depends(get_current_user),
+):
+    event = db.query(Events).filter_by(id_event=event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Мероприятие не найдено")
+
+    if event.id_owner != user_data["employee"].id_employee:
+        raise HTTPException(status_code=403, detail="Нет прав добавлять сотрудников")
+
+    add_attendee(db, event_id, employee_id)
+    db.commit()
+
+    create_notification(db, f"Вы добавлены на мероприятие: {event.name_event}", [employee_id])
+
+    return MessageDTO(message="Сотрудник успешно добавлен в мероприятие")
+
+
 @router.post("/{event_id}/join", response_model=MessageDTO)
 async def join_myself(
     event_id: UUID,
@@ -126,6 +143,7 @@ async def join_myself(
 ):
     join_event(db, event_id, user_data["employee"].id_employee)
     db.commit()
+
     return MessageDTO(message="Вы успешно присоединились к мероприятию")
 
 
@@ -180,14 +198,3 @@ async def get_one_event(
     db: Session = Depends(get_db),
 ):
     return get_event(db, event_id)
-
-
-@router.delete("/{event_id}/leave", response_model=MessageDTO)
-async def leave_myself(
-    event_id: UUID,
-    db: Session = Depends(get_db),
-    user_data: dict = Depends(get_current_user),
-):
-    leave_event(db, event_id, user_data["employee"].id_employee)
-    db.commit()
-    return MessageDTO(message="Вы отказались от участия в мероприятии")

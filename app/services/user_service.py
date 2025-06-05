@@ -17,7 +17,7 @@ from app.models.models import (
     Interests,
     Technologies, Ranks,
     Projects, Roles,
-    Positions, Departments, Employers
+    Positions, Departments, Employers, Notifications, NotificationsEmployees
 )
 from app.core.config import settings
 from app.db.get_db import get_db
@@ -68,7 +68,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(
     user = db.query(Users).filter(Users.username == username).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return {"user": user, "employee": user.employee, "token": token}
+    return {"user": user, "employee": user.employee, "token": token, "role": user.role_id}
 
 
 def get_user_with_related(db: Session, username: str) -> Optional[Dict[str, Any]]:
@@ -435,3 +435,22 @@ async def update_entity(db: Session, entity, entity_updated_data: Dict):
     db.refresh(entity)
 
     return entity
+
+
+def create_notification(db: Session, content: str, employee_ids: List[UUID]) -> UUID:
+    new_notif = Notifications(content=content)
+    db.add(new_notif)
+    db.flush()
+
+    for emp_id in employee_ids:
+        assoc = NotificationsEmployees(
+            id_notification=new_notif.id,
+            id_employee=emp_id,
+            is_shown=False
+        )
+        db.add(assoc)
+
+    db.commit()
+    db.refresh(new_notif)
+
+    return new_notif.id

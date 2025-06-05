@@ -4,7 +4,7 @@ from sqlalchemy import (
     Column,
     String,
     Date,
-    ForeignKey,
+    ForeignKey, Boolean,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base, relationship
@@ -149,3 +149,16 @@ class SystemRoles(Base):
     id_role = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     role_name = Column(String(20), nullable=False)
 
+
+class Notifications(Base):
+    __tablename__ = "notifications"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    content = Column(String(500), nullable=False)
+
+
+class NotificationsEmployees(Base):
+    __tablename__ = "notifications_employees"
+
+    id_notification = Column(UUID(as_uuid=True), ForeignKey("notifications.id"), primary_key=True)
+    id_employee = Column(UUID(as_uuid=True), ForeignKey("employers.id_employee"), primary_key=True)
+    is_shown = Column(Boolean, nullable=False)
