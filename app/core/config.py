@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int
     MAX_FAILED_ATTEMPTS: int
     BAN_DURATION_MINUTES: int
+    letsencrypt_email: str = ""
+    letsencrypt_host: str = ""
+    virtual_host: str = ""
 
     class Config:
         env_file = ".env"
