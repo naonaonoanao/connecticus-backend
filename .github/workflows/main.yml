@@ -1,0 +1,30 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  deploy-production:
+    env: 
+      SSH_USER: root
+      SSH_HOST: 85.159.231.97
+      SSH_PORT: 22
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Deploy to production stage
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ env.SSH_PORT }}
+          script: |
+            cd /root/nao_proj/connecticus-backend
+            git fetch --all
+            git reset --hard origin/main
+            cd ..
+            docker compose up --build --force-recreate -d --no-deps backend
+            sudo docker image prune -f
+            sudo docker container prune -f
