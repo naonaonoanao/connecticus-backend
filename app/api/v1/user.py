@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from app.core.config import settings
 from app.db.get_db import get_db
 from app.models.models import Users
-from app.schemas.schemas import UserResponse, Token, LoginDTO
+from app.schemas.schemas import UserResponse, Token, LoginDTO, TokenNRoleIdDto
 from app.services.user_service import (
     token_blacklist,
     failed_attempts_cache,
@@ -19,7 +19,7 @@ from app.services.user_service import (
 router = APIRouter(prefix='/user', tags=['User'])
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login", response_model=TokenNRoleIdDto)
 def login(data: LoginDTO, db: Session = Depends(get_db)):
     user = db.query(Users).filter(Users.username == data.username).first()
     if not user:
@@ -42,9 +42,12 @@ def login(data: LoginDTO, db: Session = Depends(get_db)):
     if data.username in failed_attempts_cache:
         del failed_attempts_cache[data.username]
 
-    token_data = {"sub": user.username}  # TODO: сюда можем дальше подкладывать роль
+    token_data = {"sub": user.username}
     access_token = create_access_token(data=token_data)
-    return Token(access_token=access_token)
+    return TokenNRoleIdDto(
+        token=Token(access_token=access_token),
+        role_id=user.role_id
+    )
 
 
 @router.post("/logout")

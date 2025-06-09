@@ -115,6 +115,11 @@ class Token(BaseModel):
     token_type: str = "bearer"
 
 
+class TokenNRoleIdDto(BaseModel):
+    token: Token
+    role_id: UUID
+
+
 class LoginDTO(BaseModel):
     username: str
     password: str
