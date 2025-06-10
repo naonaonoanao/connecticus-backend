@@ -64,6 +64,19 @@ class EmployeeCreate(BaseModel):
     full_name: str
 
 
+class EmployeeCreateHr(BaseModel):
+    first_name: str
+    last_name: str
+    middle_name: str
+    date_of_birth: date
+    email: str
+    phone_number: str
+    telegram_name: str
+    city: str
+    id_position: UUID
+    id_department: UUID
+
+
 class EmployeeRead(BaseModel):
     id_employee: UUID
     first_name: str
@@ -147,6 +160,37 @@ class EmployeeUpdate(BaseModel):
     phone_number: constr(strip_whitespace=True, min_length=10, max_length=20)
     telegram_name: constr(strip_whitespace=True, min_length=3, max_length=32)
     city: constr(strip_whitespace=True, min_length=1, max_length=100)
+
+    @field_validator('phone_number')
+    def validate_phone(cls, v):
+        if v and not re.match(r'^[\d\s\-\+\(\)]+$', v):
+            raise ValueError('Недопустимый формат номера телефона')
+        return v
+
+    @field_validator('telegram_name')
+    def validate_telegram_name(cls, v):
+        if v and not re.match(r'^[a-zA-Z0-9_]{3,32}$', v):
+            raise ValueError('Недопустимый Telegram username: допустимы только буквы, цифры и _')
+        return v
+
+    @field_validator('date_of_birth')
+    def validate_dob(cls, v):
+        if v and v > date.today():
+            raise ValueError('Дата рождения не может быть в будущем')
+        return
+
+
+class HrEmployeeUpdate(BaseModel):
+    date_of_birth: date
+    email: EmailStr
+    phone_number: constr(strip_whitespace=True, min_length=10, max_length=20)
+    telegram_name: constr(strip_whitespace=True, min_length=3, max_length=32)
+    city: constr(strip_whitespace=True, min_length=1, max_length=100)
+    first_name: str
+    last_name: str
+    middle_name: str
+    id_position: UUID
+    id_department: UUID
 
     @field_validator('phone_number')
     def validate_phone(cls, v):
