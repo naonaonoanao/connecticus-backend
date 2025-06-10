@@ -345,3 +345,12 @@ class NotificationOut(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class EmployeePositionDepartmentUpdate(BaseModel):
+    position_name: Optional[str] = None
+    department_name: Optional[str] = None
+
+
+class MessageDTO(BaseModel):
+    message: str

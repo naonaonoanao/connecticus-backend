@@ -6,10 +6,11 @@ from sqlalchemy.orm import Session
 from uuid import UUID
 
 from app.models.models import Employers, InterestsEmployers, TechnologyEmployee, ProjectsEmployers, Interests, \
-    Technologies
+    Technologies, Positions, Departments, Users, EventEmployers, NotificationsEmployees
 from app.schemas.schemas import EmployeeCreate, EmployeeRead, EmployeeUpdate, MessageDTO, EmployeeListWithMeta, \
     EmployeeInterestsUpdate, EmployeeTechnologiesUpdate, EmployeeProjectsUpdate, NewTechnologyInput, \
-    ExistingTechnologyInput, NewInterestInput, ExistingInterestInput, HrEmployeeUpdate, EmployeeCreateHr
+    ExistingTechnologyInput, NewInterestInput, ExistingInterestInput, HrEmployeeUpdate, EmployeeCreateHr, \
+    EmployeePositionDepartmentUpdate
 from app.db.get_db import get_db
 from app.services.user_service import check_unique_fields, get_current_user, update_entity, get_employee_with_id, \
     get_employees_list
@@ -134,14 +135,14 @@ async def edit_employee(
 @router.put("/hr/{employee_id}", response_model=MessageDTO)
 async def edit_employee_hr(
         employee_update: HrEmployeeUpdate,
-        emp_id: UUID,
+        employee_id: UUID,
         user_data: Dict = Depends(get_current_user),
         db: Session = Depends(get_db)
 ):
     try:
         duplicated_fields = await check_unique_fields(
             db=db,
-            employee_id=emp_id,
+            employee_id=employee_id,
             email=employee_update.email,
             phone=employee_update.phone_number,
             telegram=employee_update.telegram_name
@@ -152,7 +153,7 @@ async def edit_employee_hr(
 
         updated_employee = await update_entity(
             db=db,
-            entity=db.query(Employers).filter(Employers.id_employee == emp_id).first(),
+            entity=db.query(Employers).filter(Employers.id_employee == employee_id).first(),
             entity_updated_data=employee_update.dict()
         )
 
@@ -178,6 +179,9 @@ async def delete_employee_hr(
         db.query(InterestsEmployers).filter_by(id_employee=str(employee_id)).delete()
         db.query(TechnologyEmployee).filter_by(id_employee=str(employee_id)).delete()
         db.query(ProjectsEmployers).filter_by(id_employee=str(employee_id)).delete()
+        db.query(EventEmployers).filter_by(id_employee=str(employee_id)).delete()
+        db.query(NotificationsEmployees).filter_by(id_employee=str(employee_id)).delete()
+        db.query(Users).filter_by(employee_id=str(employee_id)).delete()
 
         db.delete(employee)
         db.commit()
@@ -231,51 +235,6 @@ async def create_employee_hr(
         db.rollback()
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Internal server error")
-
-
-# для hr
-@router.put("/{employee_id}/interests", response_model=MessageDTO)
-async def update_employee_interests(
-    employee_id: UUID,
-    update_data: EmployeeInterestsUpdate,
-    db: Session = Depends(get_db),
-    user_data: Dict = Depends(get_current_user)
-):
-    try:
-        # Удаляем текущие интересы
-        db.query(InterestsEmployers).filter_by(id_employee=employee_id).delete()
-
-        for interest in update_data.interests:
-            if isinstance(interest, ExistingInterestInput):
-                # Проверяем, что интерес существует
-                existing = db.query(Interests).filter_by(id_interest=interest.id).first()
-                if not existing:
-                    raise HTTPException(status_code=400, detail=f"Интереса с ID {interest.id} не существует")
-                interest_id = existing.id_interest
-
-            elif isinstance(interest, NewInterestInput):
-                # Проверяем, есть ли уже интерес с таким именем
-                existing = db.query(Interests).filter_by(name_interest=interest.name_interest).first()
-                if existing:
-                    interest_id = existing.id_interest
-                else:
-                    new_interest = Interests(name_interest=interest.name_interest)
-                    db.add(new_interest)
-                    db.flush()  # Получаем ID нового интереса
-                    interest_id = new_interest.id_interest
-
-            # Добавляем связь
-            db.add(InterestsEmployers(id_employee=employee_id, id_interest=interest_id))
-
-        db.commit()
-        return MessageDTO(message=f"Интересы сотрудника {employee_id} обновлены")
-
-    except HTTPException:
-        raise
-    except Exception:
-        db.rollback()
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail="Ошибка при обновлении интересов")
 
 
 @router.put("/me/interests", response_model=MessageDTO)
@@ -406,28 +365,3 @@ async def update_my_technologies(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Ошибка при обновлении технологий")
 
-
-# для hr
-@router.put("/{employee_id}/technologies", response_model=MessageDTO)
-async def update_employee_technologies(
-    employee_id: UUID,
-    update_data: EmployeeTechnologiesUpdate,
-    db: Session = Depends(get_db),
-    user_data: Dict = Depends(get_current_user)
-):
-    try:
-        db.query(TechnologyEmployee).filter_by(id_employee=employee_id).delete()
-
-        for tech in update_data.technologies:
-            db.add(TechnologyEmployee(
-                id_employee=employee_id,
-                id_technology=tech.id_technology,
-                id_rank=tech.id_rank
-            ))
-
-        db.commit()
-        return MessageDTO(message=f"Технологии сотрудника {employee_id} обновлены")
-    except Exception:
-        db.rollback()
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail="Ошибка при обновлении технологий")
