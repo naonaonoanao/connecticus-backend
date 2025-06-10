@@ -396,7 +396,7 @@ def get_employees_list(
 
 async def check_unique_fields(
         db: Session,
-        employee_id: UUID,
+            employee_id: UUID = None,
         email: str = None,
         phone: str = None,
         telegram: str = None

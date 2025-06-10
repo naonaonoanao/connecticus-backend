@@ -9,7 +9,7 @@ from app.models.models import Employers, InterestsEmployers, TechnologyEmployee,
     Technologies
 from app.schemas.schemas import EmployeeCreate, EmployeeRead, EmployeeUpdate, MessageDTO, EmployeeListWithMeta, \
     EmployeeInterestsUpdate, EmployeeTechnologiesUpdate, EmployeeProjectsUpdate, NewTechnologyInput, \
-    ExistingTechnologyInput, NewInterestInput, ExistingInterestInput
+    ExistingTechnologyInput, NewInterestInput, ExistingInterestInput, HrEmployeeUpdate, EmployeeCreateHr
 from app.db.get_db import get_db
 from app.services.user_service import check_unique_fields, get_current_user, update_entity, get_employee_with_id, \
     get_employees_list
@@ -129,6 +129,108 @@ async def edit_employee(
     except Exception:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Internal error")
+
+
+@router.put("/hr/{employee_id}", response_model=MessageDTO)
+async def edit_employee_hr(
+        employee_update: HrEmployeeUpdate,
+        emp_id: UUID,
+        user_data: Dict = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    try:
+        duplicated_fields = await check_unique_fields(
+            db=db,
+            employee_id=emp_id,
+            email=employee_update.email,
+            phone=employee_update.phone_number,
+            telegram=employee_update.telegram_name
+        )
+
+        if duplicated_fields:
+            raise HTTPException(status_code=400, detail=f"{str(duplicated_fields)} already in use")
+
+        updated_employee = await update_entity(
+            db=db,
+            entity=db.query(Employers).filter(Employers.id_employee == emp_id).first(),
+            entity_updated_data=employee_update.dict()
+        )
+
+        return MessageDTO(message=f"Employee {updated_employee.id_employee} successfully")
+    except HTTPException:
+        raise
+    except Exception:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Internal error")
+
+
+@router.delete("/hr/{employee_id}", response_model=MessageDTO)
+async def delete_employee_hr(
+    employee_id: UUID,
+    user_data: Dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        employee = db.query(Employers).filter_by(id_employee=str(employee_id)).first()
+        if not employee:
+            raise HTTPException(status_code=404, detail="Employee not found")
+
+        db.query(InterestsEmployers).filter_by(id_employee=str(employee_id)).delete()
+        db.query(TechnologyEmployee).filter_by(id_employee=str(employee_id)).delete()
+        db.query(ProjectsEmployers).filter_by(id_employee=str(employee_id)).delete()
+
+        db.delete(employee)
+        db.commit()
+
+        return MessageDTO(message=f"Employee {employee_id} deleted successfully")
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Error deleting employee")
+
+
+@router.post("/hr")
+async def create_employee_hr(
+    employee_in: EmployeeCreateHr,
+    user_data: Dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        # Проверяем уникальность полей
+        duplicated_fields = await check_unique_fields(
+            db=db,
+            email=employee_in.email,
+            phone=employee_in.phone_number,
+            telegram=employee_in.telegram_name
+        )
+        if duplicated_fields:
+            raise HTTPException(status_code=400, detail=f"{str(duplicated_fields)} already in use")
+
+        db_employee = Employers(
+            first_name=employee_in.first_name,
+            last_name=employee_in.last_name,
+            middle_name=employee_in.middle_name,
+            date_of_birth=employee_in.date_of_birth,
+            id_position=employee_in.id_position,
+            id_department=employee_in.id_department,
+            telegram_name=employee_in.telegram_name,
+            email=employee_in.email,
+            phone_number=employee_in.phone_number,
+            city=employee_in.city
+        )
+        db.add(db_employee)
+        db.commit()
+        db.refresh(db_employee)
+
+        return db_employee
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # для hr
